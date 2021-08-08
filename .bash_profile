@@ -939,7 +939,11 @@ parse_git_branch() {
     git branch 2> /dev/null | sed -e '/^[^*]/d' -e "s/* \(.*\)/ ($EMOJI_BRANCH \1) /"
 }
 
-export PS1="\e[44m \u@\h\e[0m\e[44m \e[42m\$(parse_git_branch)\e[0m~$ "
+carret() {
+    echo -e "$SU~\$$NC"
+}
+
+export PS1="\e[44m \u@\h \e[0m\e[44m\e[42m\$(parse_git_branch)\e[0m\$(carret)"
 
 # Local Variables:
 # mode:shell-script
