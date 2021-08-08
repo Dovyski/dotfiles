@@ -935,12 +935,18 @@ _killall()
 
 complete -F _killall killall killps
 
+vers() {
+    echo -e "php:\e[1;32m $(php -v | awk '/^PHP/{print $2}') \e[0m"
+    echo -e "composer:\e[1;32m $(composer -V | awk '{print $3}') \e[0m"
+    echo -e "node:\e[1;32m $(node -v) \e[0m"
+}
+
 parse_git_branch() {
     git branch 2> /dev/null | sed -e '/^[^*]/d' -e "s/* \(.*\)/ ($EMOJI_BRANCH \1) /"
 }
 
 carret() {
-    echo -e "$SU~\$$NC"
+    echo -e "$SU~\$$NC "
 }
 
 export PS1="\e[44m \u@\h \e[0m\e[44m\e[42m\$(parse_git_branch)\e[0m\$(carret)"
