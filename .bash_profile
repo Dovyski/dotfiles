@@ -45,6 +45,17 @@ if [ -f /etc/bashrc ]; then
       . /etc/bashrc   # --> Read /etc/bashrc, if present.
 fi
 
+#-------------------------------------------------------------
+# Emoji unicode chars (any sysop needs those, right?)
+#-------------------------------------------------------------
+
+EMOJI_SCREAM=$'\U1F631'
+EMOJI_GRINNING=$'\U1F600'
+EMOJI_ROBOT=$'\U1F916'
+EMOJI_POO=$'\U1F4A9'
+EMOJI_BRANCH=$'\U16CB'
+EMOJI_CHEVRON=$'\U27EB'
+EMOJI_TRIRIGHT=$'\U1F782'
 
 #--------------------------------------------------------------
 #  Automatic setting of $DISPLAY (if not set already).
@@ -925,10 +936,10 @@ _killall()
 complete -F _killall killall killps
 
 parse_git_branch() {
-     git branch 2> /dev/null | sed -e '/^[^*]/d' -e 's/* \(.*\)/(\1)/'
+    git branch 2> /dev/null | sed -e '/^[^*]/d' -e "s/* \(.*\)/ ($EMOJI_BRANCH \1) /"
 }
 
-export PS1="\[\033[95m\]\u\[\033[00m\]@\[\033[32m\]\h\[\033[33m\]\$(parse_git_branch)\[\033[00m\] $ "
+export PS1="\e[44m \u@\h\e[0m\e[44m \e[42m\$(parse_git_branch)\e[0m~$ "
 
 # Local Variables:
 # mode:shell-script
