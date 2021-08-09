@@ -56,6 +56,8 @@ EMOJI_POO=$'\U1F4A9'
 EMOJI_BRANCH=$'\U16CB'
 EMOJI_CHEVRON=$'\U27EB'
 EMOJI_TRIRIGHT=$'\U1F782'
+EMOJI_FOLDER=$'\U1F5C0'
+EMOJI_OPEN_FOLDER=$'\U1F4C2'
 
 #--------------------------------------------------------------
 #  Automatic setting of $DISPLAY (if not set already).
@@ -301,6 +303,23 @@ function job_color()
     fi
 }
 
+# Return the current git branch
+function parse_git_branch()
+{
+    git branch 2> /dev/null | sed -e '/^[^*]/d' -e "s/* \(.*\)/ ($EMOJI_BRANCH \1) /"
+}
+
+# Prints the string to be placed at the end of PS1
+function carret()
+{
+    echo -e "$SU~\$$NC "
+}
+
+function folder_icon
+{
+    echo -e "$EMOJI_OPEN_FOLDER"
+}
+
 # Adds some text in the terminal frame (if applicable).
 
 
@@ -321,8 +340,7 @@ case ${TERM} in
         PS1=${PS1}"\[\e]0;[\u@\h] \w\a\]"
         ;;
     *)
-        PS1="(\A \u@\h \W) > " # --> PS1="(\A \u@\h \w) > "
-                               # --> Shows full pathname of current dir.
+        PS1="\e[44m \u@\h \e[0m\e[104m \$(folder_icon)\W \e[0m\e[42m\$(parse_git_branch)\e[0m\$(carret)"
         ;;
 esac
 
@@ -612,7 +630,7 @@ function mydf()         # Pretty-print of 'df' output.
 }
 
 
-function my_ip() # Get IP adress on ethernet.
+function myip() # Get IP adress on ethernet.
 {
     MY_IP=$(/sbin/ifconfig eth0 | awk '/inet/ { print $2 } ' |
       sed -e s/addr://)
@@ -664,6 +682,12 @@ function corename()   # Get name of app that created a corefile.
     done
 }
 
+function vers()
+{
+    echo -e "php:\e[1;32m $(php -v | awk '/^PHP/{print $2}') \e[0m"
+    echo -e "composer:\e[1;32m $(composer -V | awk '{print $3}') \e[0m"
+    echo -e "node:\e[1;32m $(node -v) \e[0m"
+}
 
 
 #=========================================================================
@@ -934,22 +958,6 @@ _killall()
 }
 
 complete -F _killall killall killps
-
-vers() {
-    echo -e "php:\e[1;32m $(php -v | awk '/^PHP/{print $2}') \e[0m"
-    echo -e "composer:\e[1;32m $(composer -V | awk '{print $3}') \e[0m"
-    echo -e "node:\e[1;32m $(node -v) \e[0m"
-}
-
-parse_git_branch() {
-    git branch 2> /dev/null | sed -e '/^[^*]/d' -e "s/* \(.*\)/ ($EMOJI_BRANCH \1) /"
-}
-
-carret() {
-    echo -e "$SU~\$$NC "
-}
-
-export PS1="\e[44m \u@\h \e[0m\e[44m\e[42m\$(parse_git_branch)\e[0m\$(carret)"
 
 # Local Variables:
 # mode:shell-script
