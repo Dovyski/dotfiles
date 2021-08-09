@@ -3,7 +3,10 @@
 # PERSONAL $HOME/.bashrc FILE for bash-3.0 (or later)
 # By Emmanuel Rouat [no-email]
 #
-# Last modified: Tue Nov 20 22:04:47 CET 2012
+# Additions by:
+# Fernando Bevilacqua <dovyski@gmail.com>
+#
+# Last modified: 2021-08-09
 
 #  This file is normally read by interactive shells only.
 #+ Here is the place to define your aliases, functions and
@@ -936,8 +939,6 @@ _make()
 }
 
 complete -F _make -X '+($*|*.[cho])' make gmake pmake
-
-
 
 
 _killall()
