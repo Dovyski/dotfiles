@@ -347,7 +347,8 @@ case ${TERM} in
         ;;
 esac
 
-
+# Force a particular PS1 (comment out to use case above)
+PS1="\e[44m \u@\h \e[0m\e[104m \$(folder_icon)\W \e[0m\e[42m\$(parse_git_branch)\e[0m\$(carret)"
 
 export TIMEFORMAT=$'\nreal %3R\tuser %3U\tsys %3S\tpcpu %P\n'
 export HISTIGNORE="&:bg:fg:ll:h"
