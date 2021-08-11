@@ -1,6 +1,6 @@
 # dotfiles
 
-This repository contains my personal dotfiles. Additionally I also added some config files for tools that I use, so I can restore everything after the zombie apocaliphe has ended.
+This repository contains my personal dotfiles. Additionally I also added some config files for tools that I use, so I can restore everything after the zombie apocalipse has ended.
 
 ## `.bash_profile`
 
@@ -14,7 +14,7 @@ The additional utilities are small commands like `vers`, which shows the current
 
 ## `espanso.yml`
 
-The (espanso.yml)[espanso.yml] file is my default configuration for the (espanso)[https://espanso.org/] tool. If you are not using it, I highly recommend it. It saves a lot of typying for things you do quite often.
+The [espanso.yml](espanso.yml) file is my default configuration for the [espanso](https://espanso.org) tool. If you are not using it, I highly recommend it. It saves a lot of typying for things you do quite often.
 
 # References
 
