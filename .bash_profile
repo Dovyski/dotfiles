@@ -693,6 +693,10 @@ function vers()
     echo -e "node:\e[1;32m $(node -v) \e[0m"
 }
 
+function mails()
+{
+    less +G /var/mail/$(whoami)
+}
 
 #=========================================================================
 #
