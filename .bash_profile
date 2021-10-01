@@ -698,6 +698,29 @@ function mails()
     less +G /var/mail/$(whoami)
 }
 
+#
+# QR code generation from https://qrcode.show
+# 
+function qrcode() {
+    local input="$*"
+    [ -z "$input" ] && local input="@/dev/stdin"
+    curl -d "$input" https://qrcode.show
+}
+
+function qrsvg() {
+    local input="$*"
+    [ -z "$input" ] && local input="@/dev/stdin"
+    curl -d "${input}" https://qrcode.show -H "Accept: image/svg+xml"
+}
+
+function qrserve() {
+    local port=${1:-8080}
+    local dir=${2:-.}
+    local ip="$(ifconfig | grep -Eo '[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}' | fzf --prompt IP:)" \
+    && echo http://$ip:$port | qrcode \
+    && python -m http.server $port -b $ip -d $dir
+}
+
 #=========================================================================
 #
 #  PROGRAMMABLE COMPLETION SECTION
