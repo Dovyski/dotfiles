@@ -466,10 +466,15 @@ function xtitle()
     esac
 }
 
-
 # Aliases that use xtitle
 alias top='xtitle Processes on $HOST && top'
 alias make='xtitle Making $(basename $PWD) ; make'
+
+#-------------------------------------------------------------
+# Aliases for WSL (Windows Subsystem for Linux)
+#-------------------------------------------------------------
+# Get the ip of the host machine running the wsl
+alias winip='ip route | awk "/default/ {print \$3}"'
 
 # .. and functions
 function man()
@@ -479,6 +484,8 @@ function man()
         command man -a "$i"
     done
 }
+
+# Ali
 
 
 #-------------------------------------------------------------
