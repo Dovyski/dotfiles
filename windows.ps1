@@ -1,5 +1,5 @@
 <# 
-init-work-env.ps1 (NO ADMIN)
+windows.ps1 (NO ADMIN)
 
 1) Download + install FiraCode Nerd Font (current user only)
 2) Install oh-my-posh using winget
@@ -9,14 +9,41 @@ init-work-env.ps1 (NO ADMIN)
 $ErrorActionPreference = "Stop"
 
 function Ensure-Directory([string]$Path) {
+    if ([string]::IsNullOrWhiteSpace($Path)) { return }
     if (-not (Test-Path -LiteralPath $Path)) {
-        New-Item -ItemType Directory -Path $Path | Out-Null
+        New-Item -ItemType Directory -Path $Path -Force | Out-Null
     }
 }
 
 function Download-File([string]$Url, [string]$OutFile) {
     Write-Host "Downloading: $Url"
-    Invoke-WebRequest -Uri $Url -OutFile $OutFile -UseBasicParsing
+    Invoke-WebRequest -Uri $Url -OutFile $OutFile
+}
+
+function Get-FileContentSafe([string]$Path) {
+    if (-not (Test-Path -LiteralPath $Path)) { return "" }
+    try {
+        # Avoid relying on -Raw across environments: read as lines then join.
+        return ((Get-Content -LiteralPath $Path -ErrorAction Stop) -join "`n")
+    } catch {
+        return ""
+    }
+}
+
+function Add-LineIfMissing([string]$Path, [string]$Line) {
+    $dir = Split-Path -Parent $Path
+    Ensure-Directory $dir
+
+    if (-not (Test-Path -LiteralPath $Path)) {
+        New-Item -ItemType File -Path $Path -Force | Out-Null
+    }
+
+    $content = Get-FileContentSafe $Path
+    if ($content -notmatch [regex]::Escape($Line)) {
+        Add-Content -LiteralPath $Path -Value "`r`n# oh-my-posh`r`n$Line`r`n"
+        return $true
+    }
+    return $false
 }
 
 function Install-NerdFont-FiraCode-User {
@@ -27,47 +54,35 @@ function Install-NerdFont-FiraCode-User {
 
     Ensure-Directory $tempRoot
 
-    # Download
     if (Test-Path -LiteralPath $zipPath) { Remove-Item -LiteralPath $zipPath -Force }
     if (Test-Path -LiteralPath $extract) { Remove-Item -LiteralPath $extract -Recurse -Force }
     Download-File -Url $url -OutFile $zipPath
 
-    # Extract
     Write-Host "Extracting fonts..."
     Expand-Archive -Path $zipPath -DestinationPath $extract -Force
 
-    # Per-user fonts directory (Windows 10+)
     $userFontsDir = Join-Path $env:LOCALAPPDATA "Microsoft\Windows\Fonts"
     Ensure-Directory $userFontsDir
-
-    # Per-user font registry
     $regPath = "HKCU:\Software\Microsoft\Windows NT\CurrentVersion\Fonts"
 
     Write-Host "Installing FiraCode Nerd Font for current user..."
     $fonts = Get-ChildItem -LiteralPath $extract -Recurse -Include *.ttf -File
-    if (-not $fonts) {
-        throw "No .ttf font files found after extracting."
-    }
+    if (-not $fonts) { throw "No .ttf font files found after extracting." }
 
     foreach ($font in $fonts) {
         $dest = Join-Path $userFontsDir $font.Name
-
         if (-not (Test-Path -LiteralPath $dest)) {
             Copy-Item -LiteralPath $font.FullName -Destination $dest -Force
         }
 
-        # Register font for current user
         $displayName = ($font.BaseName -replace "-", " ") + " (TrueType)"
-        $existing = Get-ItemProperty -Path $regPath -ErrorAction SilentlyContinue |
-                    Select-Object -ExpandProperty $displayName -ErrorAction SilentlyContinue
+        $existing = $null
+        try {
+            $existing = (Get-ItemProperty -Path $regPath -ErrorAction SilentlyContinue).$displayName
+        } catch {}
 
         if (-not $existing) {
-            New-ItemProperty `
-                -Path $regPath `
-                -Name $displayName `
-                -PropertyType String `
-                -Value $font.Name `
-                -Force | Out-Null
+            New-ItemProperty -Path $regPath -Name $displayName -PropertyType String -Value $font.Name -Force | Out-Null
         }
     }
 
@@ -84,32 +99,64 @@ function Install-OhMyPosh {
     winget install JanDeDobbeleer.OhMyPosh `
         --source winget `
         --accept-source-agreements `
-        --accept-package-agreements
+        --accept-package-agreements | Out-Null
 }
 
 function Configure-OhMyPoshTheme {
-    # Use RAW GitHub URL (important)
     $themeUrl = "https://raw.githubusercontent.com/JanDeDobbeleer/oh-my-posh/main/themes/agnoster.omp.json"
     $initLine = "oh-my-posh init pwsh --config $themeUrl | Invoke-Expression"
 
     Write-Host "Applying oh-my-posh theme for this session..."
     Invoke-Expression $initLine
 
-    Write-Host "Persisting oh-my-posh config in PowerShell profile..."
-    $profileDir = Split-Path -Parent $PROFILE
-    Ensure-Directory $profileDir
+    Write-Host "Persisting oh-my-posh config in PowerShell profile(s)..."
 
-    if (-not (Test-Path -LiteralPath $PROFILE)) {
-        New-Item -ItemType File -Path $PROFILE -Force | Out-Null
+    # 1) The active host profile path for THIS session
+    $targets = New-Object System.Collections.Generic.List[string]
+    $targets.Add($PROFILE)
+
+    # 2) CurrentUserAllHosts (covers other pwsh hosts too)
+    try { $targets.Add($PROFILE.CurrentUserAllHosts) } catch {}
+
+    # 3) My Documents as Windows resolves it (handles OneDrive redirection + localized "Documentos")
+    $myDocs = [Environment]::GetFolderPath([Environment+SpecialFolder]::MyDocuments)
+    if ($myDocs) {
+        $targets.Add((Join-Path $myDocs "PowerShell\Microsoft.PowerShell_profile.ps1"))
+        $targets.Add((Join-Path $myDocs "PowerShell\profile.ps1"))
     }
 
-    $profileContent = Get-Content -LiteralPath $PROFILE -Raw -ErrorAction SilentlyContinue
-    if ($profileContent -notmatch [regex]::Escape($initLine)) {
-        Add-Content -LiteralPath $PROFILE -Value "`r`n# oh-my-posh`r`n$initLine`r`n"
-        Write-Host "Added oh-my-posh init to profile."
+    # 4) Common fallbacks (in case env is weird)
+    $targets.Add((Join-Path $HOME "Documents\PowerShell\Microsoft.PowerShell_profile.ps1"))
+    $targets.Add((Join-Path $HOME "OneDrive\Documents\PowerShell\Microsoft.PowerShell_profile.ps1"))
+    $targets.Add((Join-Path $HOME "OneDrive\Documentos\PowerShell\Microsoft.PowerShell_profile.ps1"))
+
+    # De-duplicate + keep only non-empty
+    $targets = $targets | Where-Object { $_ -and $_.Trim() } | Select-Object -Unique
+
+    $changed = @()
+    $unchanged = @()
+    foreach ($p in $targets) {
+        try {
+            if (Add-LineIfMissing -Path $p -Line $initLine) {
+                $changed += $p
+            } else {
+                $unchanged += $p
+            }
+        } catch {
+            Write-Warning "Could not write profile: $p (`$($_.Exception.Message))"
+        }
+    }
+
+    if ($changed.Count -gt 0) {
+        Write-Host "Updated profile(s):"
+        $changed | ForEach-Object { Write-Host "  - $_" }
     } else {
-        Write-Host "oh-my-posh already configured in profile."
+        Write-Host "No profile updates were needed (init line already present)."
     }
+
+    # Quick sanity check: show what THIS session will load next time
+    Write-Host "`nCurrent session `$PROFILE is:"
+    Write-Host "  $PROFILE"
 }
 
 try {
@@ -118,7 +165,7 @@ try {
     Configure-OhMyPoshTheme
 
     Write-Host "`nSetup complete!"
-    Write-Host "Open a NEW PowerShell window to see the theme automatically."
+    Write-Host "Close ALL Windows Terminal windows and open again to ensure the profile is reloaded."
 } catch {
     Write-Error $_
     exit 1
