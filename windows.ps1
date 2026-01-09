@@ -4,6 +4,7 @@ windows.ps1 (NO ADMIN)
 1) Download + install FiraCode Nerd Font (current user only)
 2) Install oh-my-posh using winget
 3) Configure oh-my-posh agnoster theme (session + persistent profile)
+4) Add terminal aliases (session + persistent profile)
 #>
 
 $ErrorActionPreference = "Stop"
@@ -44,6 +45,59 @@ function Add-LineIfMissing([string]$Path, [string]$Line) {
         return $true
     }
     return $false
+}
+
+function Add-BlockIfMissing([string]$Path, [string]$BeginMarker, [string]$EndMarker, [string]$BlockContent) {
+    $dir = Split-Path -Parent $Path
+    Ensure-Directory $dir
+
+    if (-not (Test-Path -LiteralPath $Path)) {
+        New-Item -ItemType File -Path $Path -Force | Out-Null
+    }
+
+    $content = Get-FileContentSafe $Path
+
+    $beginEsc = [regex]::Escape($BeginMarker)
+    $endEsc   = [regex]::Escape($EndMarker)
+
+    # If the block is already present (even if edited), do nothing.
+    if ($content -match "$beginEsc[\s\S]*?$endEsc") {
+        return $false
+    }
+
+    $toAppend = @"
+`r`n$BeginMarker
+$BlockContent
+$EndMarker
+"@
+
+    Add-Content -LiteralPath $Path -Value $toAppend
+    return $true
+}
+
+function Get-ProfileTargets {
+    $targets = New-Object System.Collections.Generic.List[string]
+
+    # 1) The active host profile path for THIS session
+    $targets.Add($PROFILE)
+
+    # 2) CurrentUserAllHosts (covers other pwsh hosts too)
+    try { $targets.Add($PROFILE.CurrentUserAllHosts) } catch {}
+
+    # 3) My Documents as Windows resolves it (handles OneDrive redirection + localized "Documentos")
+    $myDocs = [Environment]::GetFolderPath([Environment+SpecialFolder]::MyDocuments)
+    if ($myDocs) {
+        $targets.Add((Join-Path $myDocs "PowerShell\Microsoft.PowerShell_profile.ps1"))
+        $targets.Add((Join-Path $myDocs "PowerShell\profile.ps1"))
+    }
+
+    # 4) Common fallbacks (in case env is weird)
+    $targets.Add((Join-Path $HOME "Documents\PowerShell\Microsoft.PowerShell_profile.ps1"))
+    $targets.Add((Join-Path $HOME "OneDrive\Documents\PowerShell\Microsoft.PowerShell_profile.ps1"))
+    $targets.Add((Join-Path $HOME "OneDrive\Documentos\PowerShell\Microsoft.PowerShell_profile.ps1"))
+
+    # De-duplicate + keep only non-empty
+    return ($targets | Where-Object { $_ -and $_.Trim() } | Select-Object -Unique)
 }
 
 function Install-NerdFont-FiraCode-User {
@@ -111,36 +165,13 @@ function Configure-OhMyPoshTheme {
 
     Write-Host "Persisting oh-my-posh config in PowerShell profile(s)..."
 
-    # 1) The active host profile path for THIS session
-    $targets = New-Object System.Collections.Generic.List[string]
-    $targets.Add($PROFILE)
-
-    # 2) CurrentUserAllHosts (covers other pwsh hosts too)
-    try { $targets.Add($PROFILE.CurrentUserAllHosts) } catch {}
-
-    # 3) My Documents as Windows resolves it (handles OneDrive redirection + localized "Documentos")
-    $myDocs = [Environment]::GetFolderPath([Environment+SpecialFolder]::MyDocuments)
-    if ($myDocs) {
-        $targets.Add((Join-Path $myDocs "PowerShell\Microsoft.PowerShell_profile.ps1"))
-        $targets.Add((Join-Path $myDocs "PowerShell\profile.ps1"))
-    }
-
-    # 4) Common fallbacks (in case env is weird)
-    $targets.Add((Join-Path $HOME "Documents\PowerShell\Microsoft.PowerShell_profile.ps1"))
-    $targets.Add((Join-Path $HOME "OneDrive\Documents\PowerShell\Microsoft.PowerShell_profile.ps1"))
-    $targets.Add((Join-Path $HOME "OneDrive\Documentos\PowerShell\Microsoft.PowerShell_profile.ps1"))
-
-    # De-duplicate + keep only non-empty
-    $targets = $targets | Where-Object { $_ -and $_.Trim() } | Select-Object -Unique
+    $targets = Get-ProfileTargets
 
     $changed = @()
-    $unchanged = @()
     foreach ($p in $targets) {
         try {
             if (Add-LineIfMissing -Path $p -Line $initLine) {
                 $changed += $p
-            } else {
-                $unchanged += $p
             }
         } catch {
             Write-Warning "Could not write profile: $p (`$($_.Exception.Message))"
@@ -159,10 +190,65 @@ function Configure-OhMyPoshTheme {
     Write-Host "  $PROFILE"
 }
 
+function Configure-TerminalAliases {
+    # Session alias (available immediately in the current PowerShell session)
+    if (-not (Get-Command a -ErrorAction SilentlyContinue)) {
+        function global:a {
+            param(
+                [Parameter(ValueFromRemainingArguments = $true)]
+                [string[]]$Args
+            )
+            & php artisan @Args
+        }
+    }
+
+    # Persistent alias (added to profile(s))
+    $begin = "# >>> work-env aliases >>>"
+    $end   = "# <<< work-env aliases <<<"
+
+    $block = @'
+# Laravel shortcuts
+function a {
+    param(
+        [Parameter(ValueFromRemainingArguments = $true)]
+        [string[]]$Args
+    )
+    & php artisan @Args
+}
+
+# Prefer GNU ls over PowerShell alias
+Remove-Item Alias:ls -Force -ErrorAction SilentlyContinue
+'@
+
+    Write-Host "Persisting aliases in PowerShell profile(s)..."
+    $targets = Get-ProfileTargets
+
+    $changed = @()
+    foreach ($p in $targets) {
+        try {
+            if (Add-BlockIfMissing -Path $p -BeginMarker $begin -EndMarker $end -BlockContent $block) {
+                $changed += $p
+            }
+        } catch {
+            Write-Warning "Could not write profile: $p (`$($_.Exception.Message))"
+        }
+    }
+
+    if ($changed.Count -gt 0) {
+        Write-Host "Updated profile(s) with aliases:"
+        $changed | ForEach-Object { Write-Host "  - $_" }
+    } else {
+        Write-Host "No profile updates were needed (aliases block already present)."
+    }
+}
+
 try {
     Install-NerdFont-FiraCode-User
     Install-OhMyPosh
     Configure-OhMyPoshTheme
+
+    # Call inside the existing try..catch block, as requested
+    Configure-TerminalAliases
 
     Write-Host "`nSetup complete!"
     Write-Host "Close ALL Windows Terminal windows and open again to ensure the profile is reloaded."

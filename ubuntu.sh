@@ -44,5 +44,14 @@ source "$OSH/oh-my-bash.sh"
 EOF
 fi
 
+echo "==> Creating aliases"
+
+cat >> "$BASHRC" <<'EOF'
+
+# Laravel shortcuts
+alias a='php artisan'
+
+EOF
+
 echo "==> Done."
 echo "Restart your terminal or run: source ~/.bashrc"
