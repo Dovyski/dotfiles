@@ -66,6 +66,7 @@ alias a='php artisan'
 # ```
 #
 # creates ../repo-name-1234 and branch 1234
+# --- w: create git worktree from current repo and cd into it ---
 w() {
     # Help
     if [[ $# -eq 0 || "$1" == "-h" || "$1" == "--help" || "$1" == "help" ]]; then
@@ -75,15 +76,15 @@ w() {
         echo ""
         echo "Examples:"
         echo "  w 45"
-        echo "    → branch: 45"
-        echo "    → worktree: ../<repo>-45"
+        echo "    -> branch: 45"
+        echo "    -> worktree: ../<repo>-45"
         echo ""
         echo "  w 45 tweak google columns"
-        echo "    → branch: 45-tweak-google-columns"
-        echo "    → worktree: ../<repo>-45-tweak-google-columns"
+        echo "    -> branch: 45-tweak-google-columns"
+        echo "    -> worktree: ../<repo>-45-tweak-google-columns"
         echo ""
         echo "Notes:"
-        echo "  - Must be run inside a git repository"
+        echo "  - Run inside a git repository"
         echo "  - Description is converted to kebab-case"
         echo ""
         return 0
@@ -104,7 +105,7 @@ w() {
 
     REPO_NAME="$(basename "$(pwd)")"
 
-    # Build kebab-case description
+    # Build kebab-case description if provided
     if [[ $# -gt 0 ]]; then
         DESC="$(printf '%s ' "$@" \
             | tr '[:upper:]' '[:lower:]' \
@@ -146,14 +147,11 @@ wr() {
 
     CURRENT_PATH="$(cd "$(pwd)" && pwd)"
 
-    MAIN_WORKTREE="$(git worktree list --porcelain \
-        | awk '/^worktree / {print $2; exit}')"
-
+    MAIN_WORKTREE="$(git worktree list --porcelain | awk '/^worktree / {print $2; exit}')"
     if [[ -z "$MAIN_WORKTREE" ]]; then
         echo "Error: Unable to determine main worktree."
         return 1
     fi
-
     MAIN_WORKTREE="$(cd "$MAIN_WORKTREE" && pwd)"
 
     if [[ "$CURRENT_PATH" == "$MAIN_WORKTREE" ]]; then
@@ -176,11 +174,10 @@ wr() {
     git worktree remove "$CURRENT_PATH" || return 1
 
     echo ""
-    echo "Worktree removed."
+    echo "Worktree removed successfully."
     echo "Now in:"
     echo "  $MAIN_WORKTREE"
 }
-
 
 EOF
 
