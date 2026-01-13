@@ -218,6 +218,105 @@ function a {
 
 # Prefer GNU ls over PowerShell alias
 Remove-Item Alias:ls -Force -ErrorAction SilentlyContinue
+
+# Git worktree for issue, usage like:
+#
+# ```bash
+#  w 1234 add user login
+# ```
+#
+# creates a worktree in ../repo-name-1234-add-user-login
+# and a branch named 1234-add-user-login. It can also just be
+# called with the issue number only:
+#
+# ```bash
+#  w 1234
+# ```
+#
+# creates ../repo-name-1234 and branch 1234
+function w {
+    param(
+        [Parameter(Position = 0)]
+        [string]$Issue,
+
+        [Parameter(ValueFromRemainingArguments = $true)]
+        [string[]]$Description
+    )
+
+    # Show help if no args or help flag
+    if (-not $Issue -or $Issue -in @('-h', '--help', 'help')) {
+        Write-Host ""
+        Write-Host "Usage:"
+        Write-Host "  w <ISSUE> [description words...]"
+        Write-Host ""
+        Write-Host "Examples:"
+        Write-Host "  w 45"
+        Write-Host "    → creates branch '45'"
+        Write-Host "    → creates worktree '../<repo>-45'"
+        Write-Host ""
+        Write-Host "  w 45 tweak google columns"
+        Write-Host "    → branch: 45-tweak-google-columns"
+        Write-Host "    → worktree: ../<repo>-45-tweak-google-columns"
+        Write-Host ""
+        Write-Host "Notes:"
+        Write-Host "  - Must be run inside a git repository"
+        Write-Host "  - Description is converted to kebab-case"
+        Write-Host ""
+        return
+    }
+
+    # Ensure issue is numeric
+    if ($Issue -notmatch '^\d+$') {
+        Write-Error "Issue number must be numeric."
+        return
+    }
+
+    # Ensure we're inside a git repo
+    if (-not (git rev-parse --is-inside-work-tree 2>$null)) {
+        Write-Error "Not inside a git repository."
+        return
+    }
+
+    $Issue = [int]$Issue
+
+    # Current repo name
+    $repoName = Split-Path -Leaf (Get-Location)
+
+    # Build kebab-case description
+    $kebab = $null
+    if ($Description.Count -gt 0) {
+        $kebab = ($Description -join ' ') `
+            -replace '[^a-zA-Z0-9\s-]', '' `
+            -replace '\s+', '-' `
+            | ForEach-Object { $_.ToLower() }
+    }
+
+    # Branch name
+    $branch = if ($kebab) {
+        "$Issue-$kebab"
+    } else {
+        "$Issue"
+    }
+
+    # Worktree dir
+    $worktreeDir = if ($kebab) {
+        "../$repoName-$Issue-$kebab"
+    } else {
+        "../$repoName-$Issue"
+    }
+
+    Write-Host "Creating worktree:"
+    Write-Host "  Branch : $branch"
+    Write-Host "  Path   : $worktreeDir"
+
+    git worktree add $worktreeDir -b $branch
+    if ($LASTEXITCODE -ne 0) {
+        Write-Error "git worktree add failed."
+        return
+    }
+
+    Set-Location $worktreeDir
+}
 '@
 
     Write-Host "Persisting aliases in PowerShell profile(s)..."
