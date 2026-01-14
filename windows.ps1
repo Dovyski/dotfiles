@@ -368,6 +368,26 @@ function wr {
     Write-Host "Now in:"
     Write-Host "  $mainWorktree"
 }
+
+# Convert input to kebab-case
+# Usage:
+# ```bash
+#  kb This is a Test!
+# ```
+# Outputs:
+# ```
+#  this-is-a-test
+function kb {
+    param(
+        [Parameter(ValueFromRemainingArguments = $true)]
+        [string[]]$Args
+    )
+
+    if (-not $Args -or $Args.Count -eq 0) { return }
+
+    $text = (($Args -join ' ').ToLower() -replace '[^a-z0-9]+', '-' -replace '^-+|-+$', '')
+    Write-Output $text
+}
 '@
 
     Write-Host "Persisting aliases in PowerShell profile(s)..."
